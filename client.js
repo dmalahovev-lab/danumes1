@@ -2,8 +2,8 @@
 const SUPABASE_URL = "https://supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtbWpkbHBlbXR1bG96dXNmcXpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMTA2NTUsImV4cCI6MjEwMTU4NjY1NX0.G_v1JYAxKYYU02V0QPnVKeqG4nGDii29WyN5kCi7aAc";
 
-// Инициализируем клиент Supabase
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// Инициализируем клиент (Используем window.supabase, чтобы избежать конфликта!)
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let myUsername = null; 
 let activeChatUser = null;
