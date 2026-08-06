@@ -457,9 +457,6 @@ function closeActiveAction() {
     if (editingMsgId) { messageInput.value = ''; editingMsgId = null; } 
     actionPreviewArea.style.display = 'none'; 
 }
-const actionPreviewArea = document.getElementById('actionPreviewArea');
-const actionPreviewTitle = document.getElementById('actionPreviewTitle');
-const actionPreviewText = document.getElementById('actionPreviewText');
 document.getElementById('cancelActionBtn').onclick = closeActiveAction;
 
 sendBtn.addEventListener('click', sendMessage);
