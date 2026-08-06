@@ -6,15 +6,10 @@
     <title>Danumes Messenger</title>
     <link href="https://googleapis.com" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    
-    <!-- Библиотеки Firebase -->
-    <script src="https://gstatic.com"></script>
-    <script src="https://gstatic.com"></script>
-    <script src="https://gstatic.com"></script>
 </head>
 <body class="theme-glass">
 
-    <!-- Форма Входа и Регистрации (Обновленная!) -->
+    <!-- Форма Входа и Регистрации -->
     <div id="authScreen" class="auth-container">
         <div class="auth-card">
             <h2 id="authTitle">Вход в Danumes</h2>
@@ -75,6 +70,12 @@
         </div>
     </div>
 
+    <!-- ПОДКЛЮЧАЕМ СЕРВЕРА FIREBASE СТРОГО ПЕРЕД НАШИМ СКРИПТОМ -->
+    <script src="https://gstatic.com"></script>
+    <script src="https://gstatic.com"></script>
+    <script src="https://gstatic.com"></script>
+    
+    <!-- Наш главный скрипт логики -->
     <script src="client.js"></script>
 </body>
 </html>
