@@ -1,21 +1,11 @@
-// Конфигурация Firebase (ЗАМЕНИТЕ НА СВОИ ДАННЫЕ ИЗ ШАГА 1)
-const firebaseConfig = {
-  apiKey: "AIzaSyAMLHgbgScQa9jsLrWpEZ79BdspDG1K8xI",
-  authDomain: "danumesss.firebaseapp.com",
-  projectId: "danumesss",
-  storageBucket: "danumesss.firebasestorage.app",
-  messagingSenderId: "698592417925",
-  appId: "1:698592417925:web:2422abf4bba42a57b571ec",
-  measurementId: "G-J6Z6ZSV9S0"
-};
+// Автоматически собираем ваши ключи и ссылку
+const SUPABASE_URL = "https://supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtbWpkbHBlbXR1bG96dXNmcXpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMTA2NTUsImV4cCI6MjEwMTU4NjY1NX0.G_v1JYAxKYYU02V0QPnVKeqG4nGDii29WyN5kCi7aAc";
 
-// Инициализация сервисов Google
-firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
-const auth = firebase.auth();
+// Инициализируем клиент Supabase
+const supabase = googleSupabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let myUsername = null; 
-let myCleanId = null; // Чистый ID без точек для базы данных
 let activeChatUser = null;
 let typingTimeout = null;
 let replyingToMsgId = null;
@@ -23,7 +13,7 @@ let editingMsgId = null;
 let activeContextMenu = null;
 let isLoginMode = true;
 
-// Элементы UI
+// Элементы интерфейса
 const authScreen = document.getElementById('authScreen');
 const appScreen = document.getElementById('appScreen');
 const authTitle = document.getElementById('authTitle');
@@ -40,6 +30,10 @@ const activeChatStatus = document.getElementById('activeChatStatus');
 const attachBtn = document.getElementById('attachBtn');
 const imageInput = document.getElementById('imageInput');
 
+const actionPreviewArea = document.getElementById('actionPreviewArea');
+const actionPreviewTitle = document.getElementById('actionPreviewTitle');
+const actionPreviewText = document.getElementById('actionPreviewText');
+
 // Переключатель Вход / Регистрация
 toggleAuth.addEventListener('click', () => {
     isLoginMode = !isLoginMode;
@@ -48,35 +42,28 @@ toggleAuth.addEventListener('click', () => {
     toggleAuth.innerText = isLoginMode ? 'Нет аккаунта? Зарегистрироваться' : 'Уже есть аккаунт? Войти';
 });
 
-// Логика работы кнопки Входа / Регистрации
-authBtn.addEventListener('click', () => {
+// Кнопка Входа и Регистрации через Supabase Auth
+authBtn.addEventListener('click', async () => {
     const email = document.getElementById('authUsername').value.trim().toLowerCase();
     const password = document.getElementById('authPassword').value.trim();
 
     if (!email || !password) return alert('Заполните все поля!');
-    if (password.length < 6) return alert('Пароль должен быть не менее 6 символов!');
+    if (password.length < 6) return alert('Пароль должен быть от 6 символов!');
 
     if (isLoginMode) {
-        // ВХОД В АККАУНТ
-        auth.signInWithEmailAndPassword(email, password)
-            .then((userCredential) => {
-                myUsername = email;
-                myCleanId = email.replace(/\./g, ','); // Firebase не любит точки в путях
-                startApp();
-            })
-            .catch((error) => {
-                alert('Ошибка входа: ' + error.message);
-            });
+        // Вход
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) return alert('Ошибка входа: ' + error.message);
+        
+        myUsername = email;
+        startApp();
     } else {
-        // РЕГИСТРАЦИЯ НОВОГО ПОЛЬЗОВАТЕЛЯ
-        auth.createUserWithEmailAndPassword(email, password)
-            .then((userCredential) => {
-                alert('Регистрация успешна! Теперь нажмите "Войти".');
-                toggleAuth.click();
-            })
-            .catch((error) => {
-                alert('Ошибка регистрации: ' + error.message);
-            });
+        // Регистрация
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) return alert('Ошибка регистрации: ' + error.message);
+        
+        alert('Регистрация успешна! Теперь войдите в аккаунт.');
+        toggleAuth.click();
     }
 });
 
@@ -86,6 +73,7 @@ function startApp() {
     document.getElementById('myUsername').innerText = myUsername;
     document.getElementById('myAvatar').innerText = myUsername.charAt(0).toUpperCase();
 
+    // Запускаем живое обновление
     listenToMessages();
     listenToTyping();
 }
@@ -116,42 +104,40 @@ function openChatWith(username) {
 }
 let globalMessagesList = [];
 
-// Очищаем Email от точек для создания путей в Firebase
-function cleanEmail(email) {
-    return email.replace(/\./g, ',');
-}
-
-// Генерируем уникальный ID комнаты для двоих пользователей
+// Генерируем уникальный ID комнаты для диалога двоих
 function getChatRoomId(user1, user2) {
-    return [cleanEmail(user1), cleanEmail(user2)].sort().join('_');
+    return [user1.trim().toLowerCase(), user2.trim().toLowerCase()].sort().join('_');
 }
 
-// Отправка сообщений
-function sendMessage() {
+// Отправка сообщений в Supabase
+async function sendMessage() {
     const text = messageInput.value.trim();
     if (!text || !activeChatUser) return;
 
     const roomId = getChatRoomId(myUsername, activeChatUser);
-    const mRef = database.ref('chats/' + roomId);
 
     if (editingMsgId) {
-        mRef.child(editingMsgId).update({
-            text: text,
-            isEdited: true
-        });
+        // Редактирование существующего сообщения
+        const { error } = await supabase
+            .from('messages')
+            .update({ text: text, is_edited: true })
+            .eq('id', editingMsgId);
+
+        if (error) console.error('Ошибка редактирования:', error);
     } else {
-        const newMsgRef = mRef.push();
-        newMsgRef.set({
-            id: newMsgRef.key,
-            from: myUsername,
-            to: activeChatUser,
-            text: text,
-            replyTo: replyingToMsgId || null,
-            time: new Date().toLocaleTimeString([], { 
-                hour: '2-digit', 
-                minute: '2-digit' 
-            })
-        });
+        // Новое сообщение или ответ
+        const { error } = await supabase
+            .from('messages')
+            .insert([{
+                from_user: myUsername,
+                to_user: activeChatUser,
+                room_id: roomId,
+                text: text,
+                reply_to: replyingToMsgId || null,
+                reactions: {}
+            }]);
+
+        if (error) console.error('Ошибка отправки сообщения:', error);
     }
     
     closeActiveAction();
@@ -159,59 +145,83 @@ function sendMessage() {
     sendTypingStatus(false);
 }
 
-// Отправка картинок
+// Отправка изображений в Supabase
 attachBtn.addEventListener('click', () => imageInput.click());
+
 imageInput.addEventListener('change', () => {
     const file = imageInput.files[0];
     if (!file || !activeChatUser) return;
 
     const reader = new FileReader();
-    reader.onload = function(e) {
-        const rId = getChatRoomId(myUsername, activeChatUser);
-        const newMsgRef = database.ref('chats/' + rId).push();
-        newMsgRef.set({
-            id: newMsgRef.key,
-            from: myUsername,
-            to: activeChatUser,
-            image: e.target.result,
-            replyTo: replyingToMsgId || null,
-            time: new Date().toLocaleTimeString([], { 
-                hour: '2-digit', 
-                minute: '2-digit' 
-            })
-        });
+    reader.onload = async function(e) {
+        const roomId = getChatRoomId(myUsername, activeChatUser);
+        
+        const { error } = await supabase
+            .from('messages')
+            .insert([{
+                from_user: myUsername,
+                to_user: activeChatUser,
+                room_id: roomId,
+                image: e.target.result,
+                reply_to: replyingToMsgId || null,
+                reactions: {}
+            }]);
+
+        if (error) console.error('Ошибка отправки картинки:', error);
         closeActiveAction();
     };
     reader.readAsDataURL(file);
     imageInput.value = '';
 });
+// Подписка на живые обновления сообщений в Supabase
+async function listenToMessages() {
+    // 1. Сначала скачиваем уже существующую историю переписок
+    const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`from_user.eq.${myUsername},to_user.eq.${myUsername}`);
 
-// Прослушивание базы данных Firebase
-function listenToMessages() {
-    database.ref('chats').on('value', (snapshot) => {
-        globalMessagesList = [];
-        const chats = snapshot.val();
-        if (chats) {
-            const myClean = cleanEmail(myUsername);
-            Object.keys(chats).forEach(roomId => {
-                if (roomId.includes(myClean)) {
-                    Object.values(chats[roomId]).forEach(msg => {
-                        globalMessagesList.push(msg);
-                    });
-                }
-            });
-        }
+    if (error) {
+        console.error('Ошибка загрузки истории:', error);
+    } else if (data) {
+        globalMessagesList = data;
         rebuildChatsList();
         renderMessages();
-    });
+    }
+
+    // 2. Включаем Realtime-слушатель на любые изменения в таблице messages
+    supabase
+        .channel('public:messages')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, payload => {
+            const newRow = payload.new;
+            const oldRow = payload.old;
+
+            if (payload.eventType === 'INSERT') {
+                // Если это новое сообщение для нас
+                if (newRow.from_user === myUsername || newRow.to_user === myUsername) {
+                    globalMessagesList.push(newRow);
+                }
+            } else if (payload.eventType === 'UPDATE') {
+                // Если сообщение обновили (изменили текст или поставили реакцию)
+                const index = globalMessagesList.findIndex(m => m.id === newRow.id);
+                if (index !== -1) globalMessagesList[index] = newRow;
+            } else if (payload.eventType === 'DELETE') {
+                // If сообщение удалили
+                globalMessagesList = globalMessagesList.filter(m => m.id !== oldRow.id);
+            }
+
+            rebuildChatsList();
+            renderMessages();
+        })
+        .subscribe();
 }
 
-// Обновление списка чатов слева
+// Пересборка списка чатов на левой панели
 function rebuildChatsList() {
     const dialogs = new Set();
     globalMessagesList.forEach(m => {
-        if (m.from === myUsername) dialogs.add(m.to);
-        if (m.to === myUsername) dialogs.add(m.from);
+        if (m.from_user === myUsername) dialogs.add(m.to_user);
+        if (m.to_user === myUsername) dialogs.add(m.from_user);
     });
     if (activeChatUser) dialogs.add(activeChatUser);
 
@@ -219,10 +229,11 @@ function rebuildChatsList() {
     dialogs.forEach(user => {
         const isActive = user === activeChatUser ? 'active' : '';
         const chatMsgs = globalMessagesList.filter(m => 
-            (m.from === myUsername && m.to === user) || 
-            (m.from === user && m.to === myUsername)
+            (m.from_user === myUsername && m.to_user === user) || 
+            (m.from_user === user && m.to_user === myUsername)
         );
         const lastMsg = chatMsgs[chatMsgs.length - 1];
+        
         let textPreview = 'Нет сообщений';
         if (lastMsg) {
             textPreview = lastMsg.image ? '📷 Фото' : lastMsg.text;
@@ -247,8 +258,8 @@ function renderMessages() {
     messagesContainer.innerHTML = '';
 
     const currentChatMessages = globalMessagesList.filter(m => 
-        (m.from === myUsername && m.to === activeChatUser) || 
-        (m.from === activeChatUser && m.to === myUsername)
+        (m.from_user === myUsername && m.to_user === activeChatUser) || 
+        (m.from_user === activeChatUser && m.to_user === myUsername)
     );
 
     if (currentChatMessages.length === 0) {
@@ -260,18 +271,18 @@ function renderMessages() {
     }
 
     currentChatMessages.forEach(m => {
-        const isOut = m.from === myUsername;
+        const isOut = m.from_user === myUsername;
         const div = document.createElement('div');
         div.className = `message ${isOut ? 'outgoing' : 'incoming'}`;
         div.dataset.id = m.id;
 
         // Плашка ответа (цитирование)
-        if (m.replyTo) {
-            const orig = globalMessagesList.find(o => o.id === m.replyTo);
+        if (m.reply_to) {
+            const orig = globalMessagesList.find(o => o.id === m.reply_to);
             if (orig) {
                 const quoteDiv = document.createElement('div');
                 quoteDiv.className = 'reply-quote-block';
-                const name = orig.from === myUsername ? 'Вы' : orig.from;
+                const name = orig.from_user === myUsername ? 'Вы' : orig.from_user;
                 const txt = orig.image ? '📷 Фото' : orig.text;
                 quoteDiv.innerHTML = `<b>${name}</b><span>${txt}</span>`;
                 div.appendChild(quoteDiv);
@@ -299,16 +310,17 @@ function renderMessages() {
         footerDiv.style.alignItems = 'center';
         footerDiv.style.marginTop = '4px';
 
-        if (m.isEdited) {
+        if (m.is_edited) {
             const edSpan = document.createElement('span'); 
             edSpan.className = 'edited-marker'; 
             edSpan.innerText = 'изм.'; 
             footerDiv.appendChild(edSpan);
         }
 
+        const msgTime = m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
         const timeSpan = document.createElement('span'); 
         timeSpan.className = 'message-time'; 
-        timeSpan.innerText = m.time;
+        timeSpan.innerText = msgTime;
         footerDiv.appendChild(timeSpan);
         div.appendChild(footerDiv);
 
@@ -323,12 +335,13 @@ function renderMessages() {
         div.appendChild(trigger);
 
         // Реакции под сообщением
-        if (m.reactions) {
+        if (m.reactions && Object.keys(m.reactions).length > 0) {
             const rContainer = document.createElement('div');
             rContainer.className = 'message-reactions-container';
             Object.entries(m.reactions).forEach(([emoji, uList]) => {
+                if (!uList || uList.length === 0) return;
                 const badge = document.createElement('div');
-                const hasMy = uList.includes(myCleanId);
+                const hasMy = uList.includes(myUsername);
                 badge.className = `reaction-badge ${hasMy ? 'my-reacted' : ''}`;
                 badge.innerHTML = `<span>${emoji}</span><small>${uList.length}</small>`;
                 badge.onclick = (e) => { 
@@ -380,7 +393,7 @@ function showContextMenu(e, msg) {
     };
     menu.appendChild(replyBtn);
 
-    if (msg.from === myUsername) {
+    if (msg.from_user === myUsername) {
         if (!msg.image) {
             const editBtn = document.createElement('button'); 
             editBtn.className = 'msg-menu-item'; 
@@ -394,10 +407,9 @@ function showContextMenu(e, msg) {
         const deleteBtn = document.createElement('button'); 
         deleteBtn.className = 'msg-menu-item delete-item'; 
         deleteBtn.innerText = 'Удалить';
-        deleteBtn.onclick = () => {
+        deleteBtn.onclick = async () => {
             if (confirm('Удалить сообщение для всех?')) {
-                const rId = getChatRoomId(myUsername, activeChatUser);
-                database.ref('chats/' + rId + '/' + msg.id).remove();
+                await supabase.from('messages').delete().eq('id', msg.id);
             }
             removeContextMenu();
         };
@@ -416,27 +428,30 @@ function removeContextMenu() {
 document.addEventListener('click', removeContextMenu);
 
 // Переключение реакций
-function sendReaction(msgId, emoji) {
-    const rId = getChatRoomId(myUsername, activeChatUser);
-    const rRef = database.ref(
-        'chats/' + rId + '/' + msgId + '/reactions/' + emoji
-    );
-    rRef.once('value', snapshot => {
-        let currentUsers = snapshot.val() || [];
-        const index = currentUsers.indexOf(myCleanId);
-        if (index !== -1) {
-            currentUsers.splice(index, 1);
-        } else {
-            currentUsers.push(myCleanId);
-        }
-        rRef.set(currentUsers);
-    });
+async function sendReaction(msgId, emoji) {
+    const msg = globalMessagesList.find(m => m.id === msgId);
+    if (!msg) return;
+
+    let currentReactions = msg.reactions || {};
+    let uList = currentReactions[emoji] || [];
+
+    const index = uList.indexOf(myUsername);
+    if (index !== -1) {
+        uList.splice(index, 1);
+    } else {
+        uList.push(myUsername);
+    }
+
+    currentReactions[emoji] = uList;
+    if (uList.length === 0) delete currentReactions[emoji];
+
+    await supabase.from('messages').update({ reactions: currentReactions }).eq('id', msgId);
 }
 
 function setupReply(msg) { 
     closeActiveAction(); 
     replyingToMsgId = msg.id; 
-    actionPreviewTitle.innerText = `Ответ пользователю ${msg.from}`; 
+    actionPreviewTitle.innerText = `Ответ пользователю ${msg.from_user}`; 
     actionPreviewText.innerText = msg.image ? '📷 Фото' : msg.text; 
     actionPreviewArea.style.display = 'flex'; 
     messageInput.focus(); 
@@ -464,7 +479,7 @@ messageInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendMessage(); 
 });
 
-// Живой статус "печатает..." через Firebase
+// Живой статус "печатает..." через Supabase
 messageInput.addEventListener('input', () => { 
     if (!activeChatUser) return; 
     sendTypingStatus(true); 
@@ -472,41 +487,46 @@ messageInput.addEventListener('input', () => {
     typingTimeout = setTimeout(() => sendTypingStatus(false), 2000); 
 });
 
-function sendTypingStatus(isTyping) { 
-    if (activeChatUser) { 
-        const targetClean = cleanEmail(activeChatUser);
-        database.ref('typing/' + targetClean + '/' + myCleanId).set(isTyping); 
-    } 
+async function sendTypingStatus(isTyping) { 
+    if (!activeChatUser) return;
+    const roomId = getChatRoomId(myUsername, activeChatUser);
+
+    const { data } = await supabase
+        .from('typing_statuses')
+        .select('*')
+        .eq('room_id', roomId)
+        .eq('user_email', myUsername);
+
+    if (data && data.length > 0) {
+        await supabase.from('typing_statuses').update({ is_typing: isTyping, updated_at: new Date() }).eq('id', data[0].id);
+    } else {
+        await supabase.from('typing_statuses').insert([{ room_id: roomId, user_email: myUsername, is_typing: isTyping }]);
+    }
 }
 
 function listenToTyping() {
-    database.ref('typing/' + myCleanId).on('value', snapshot => {
-        const statuses = snapshot.val();
-        if (activeChatUser) {
-            const targetClean = cleanEmail(activeChatUser);
-            if (statuses && statuses[targetClean]) {
-                activeChatStatus.innerText = 'печатает...'; 
-                activeChatStatus.className = 'typing-status';
-            } else {
-                activeChatStatus.innerText = 'в сети'; 
-                activeChatStatus.className = '';
+    supabase
+        .channel('public:typing_statuses')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'typing_statuses' }, payload => {
+            const row = payload.new;
+            if (!activeChatUser) return;
+            const roomId = getChatRoomId(myUsername, activeChatUser);
+
+            if (row && row.room_id === roomId && row.user_email === activeChatUser) {
+                if (row.is_typing) {
+                    activeChatStatus.innerText = 'печатает...'; 
+                    activeChatStatus.className = 'typing-status';
+                } else {
+                    activeChatStatus.innerText = 'в сети'; 
+                    activeChatStatus.className = '';
+                }
             }
-        }
-    });
+        })
+        .subscribe();
 }
 
 // Настройки тем
 const modal = document.getElementById('settingsModal');
-document.getElementById('openSettings').onclick = () => { 
-    modal.style.display = 'flex'; 
-};
-document.getElementById('closeSettings').onclick = () => { 
-    modal.style.display = 'none'; 
-};
-window.setTheme = function(themeName) { 
-    document.body.className = 'theme-' + themeName; 
-};
-
-window.setTheme = function(themeName) { 
-    document.body.className = 'theme-' + themeName; 
-};
+document.getElementById('openSettings').onclick = () => { modal.style.display = 'flex'; };
+document.getElementById('closeSettings').onclick = () => { modal.style.display = 'none'; };
+window.setTheme = function(themeName) { document.body.className = 'theme-' + themeName; };
