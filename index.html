@@ -7,22 +7,25 @@
     <link href="https://googleapis.com" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     
-    <!-- Подключаем официальные библиотеки Firebase (Базы Данных) -->
+    <!-- Библиотеки Firebase -->
+    <script src="https://gstatic.com"></script>
     <script src="https://gstatic.com"></script>
     <script src="https://gstatic.com"></script>
 </head>
 <body class="theme-glass">
 
-    <!-- Форма входа -->
+    <!-- Форма Входа и Регистрации (Обновленная!) -->
     <div id="authScreen" class="auth-container">
         <div class="auth-card">
-            <h2>Вход в Danumes</h2>
-            <input type="text" id="authUsername" placeholder="Придумайте уникальный логин">
-            <button id="authBtn">Войти в мессенджер</button>
+            <h2 id="authTitle">Вход в Danumes</h2>
+            <input type="text" id="authUsername" placeholder="Ваш Email (например, user@danumes.ru)">
+            <input type="password" id="authPassword" placeholder="Пароль">
+            <button id="authBtn">Войти</button>
+            <p id="toggleAuth" style="margin-top:15px; font-size:13px; color:var(--text-muted); cursor:pointer;">Нет аккаунта? Зарегистрироваться</p>
         </div>
     </div>
 
-    <!-- Главный экран -->
+    <!-- Главный экран мессенджера -->
     <div id="appScreen" class="messenger-container" style="display: none;">
         <aside class="sidebar">
             <div class="profile-section">
@@ -34,7 +37,7 @@
                 <svg id="openSettings" class="settings-toggle-btn" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
             </div>
             <div class="search-bar">
-                <input type="text" id="userSearchInput" placeholder="Введите точный логин друга...">
+                <input type="text" id="userSearchInput" placeholder="Введите Email друга...">
                 <button id="startChatBtn" style="width:100%; margin-top:8px; padding:8px; background:var(--accent-gradient); border:none; border-radius:8px; color:white; font-size:12px; cursor:pointer;">Начать чат</button>
             </div>
             <div class="chats-list" id="chatsList"></div>
@@ -48,7 +51,7 @@
                 </div>
             </header>
             <div class="messages-container" id="messagesContainer">
-                <div class="placeholder-text">Введите логин друга в поиске и нажмите кнопку "Начать чат".</div>
+                <div class="placeholder-text">Введите Email друга в поиске и нажмите кнопку "Начать чат".</div>
             </div>
             <footer class="chat-input-area">
                 <input type="file" id="imageInput" accept="image/*" style="display: none;">
